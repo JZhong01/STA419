@@ -1,0 +1,278 @@
+---
+title: "HW 7"
+author: "Joshua Zhong"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r options, echo = TRUE, include = FALSE}
+    
+    #library(tidyverse)
+    #library(dplyr)
+    library(ggplot2)
+    library(GGally)
+    #library(knitr)
+    #library(kableExtra)
+    library(caret)
+    library(e1071)
+    library(MASS)
+    library(leaps)
+
+    knitr::opts_chunk$set(
+    	echo = TRUE,
+    	message = FALSE,
+    	warning = FALSE,
+    	comment = NA,
+    	results = TRUE,
+    	digits = 4
+    )
+
+```
+
+
+```{r q1}
+
+setwd("C:/STA419")
+hw7 <- read.csv(file = "HW7data.csv")
+  
+```
+
+
+## Question 2
+
+### Part A
+
+Using ggplot, we create a scatterplot between Solubility and all 228 of our predictor variables. We got an RMSE of 0.7126. This value, when considering the distribution for Solubility has a left skew and a standard deviation of 2.054, means that this fit is decent; however, if we're aiming for high precision, this is not good enough. 
+
+```{r part a}
+set.seed(1)
+fitControl <- trainControl(method = "cv", number = 10)
+
+model.cv <- train(Solubility ~ ., 
+                  data = hw7, 
+                  method = "lm",
+                  trControl = fitControl)
+model.cv
+
+summary(hw7$Solubility)
+sd(hw7$Solubility)
+
+```
+
+
+
+
+### Part B
+
+We now look at the histogram of the coefficient estimates from the full linear regression model from part A. We see that the distribution is  unimodal and normal; however, it suffers from heavy kurtosis with a kurtosis of 11.589. The majority of coefficient estimates lie between 0 and 1, with values between -1 and 1 taking up more than 90% of coefficient values. 
+
+```{r part b}
+  
+  hist(summary(model.cv)$coefficient)
+  kurtosis(summary(model.cv)$coefficient)
+  
+
+```
+
+
+
+
+### Part C
+
+Using backward stepwise regression with 150 potential predictors and 10-fold cross validation, the optimal number of predictors are 117. The estimate for this test RMSE is 0.71024. This RMSE is lower than the previous model indicating a better model fit. I believe the reason we did better with fewer predictors in the model is because the stepwise regression removed the factors that contributed the least model prediction and as a result, we were able to select the model that had the fewest predictors with the best model fit. 
+
+
+
+```{r part c}
+
+set.seed(1)
+
+
+fitControl <- trainControl(method = "cv", number = 10)
+
+nvmaxGrid <- expand.grid(nvmax = seq(1, 150, 1))
+
+
+step_model <- train(Solubility ~ ., 
+                    data = hw7, 
+                    method = "leapBackward", 
+                    tuneGrid = nvmaxGrid, 
+                    trControl = fitControl)
+
+
+print(step_model)
+
+
+optimal_predictors <- step_model$bestTune$nvmax
+optimal_predictors
+
+
+rmse_result <- step_model$results$RMSE[117]
+rmse_result
+
+
+
+  
+  
+  
+```
+
+
+========================================================================
+
+
+
+### Part D
+
+
+
+```{r part d}
+
+ggplot(step_model$model, aes(x =Limit, y =Balance,color = Student)) +
+  geom_point( ) +
+  geom_smooth(method = lm)
+
+
+```
+
+
+
+### Part E
+
+Next, we plot the scatterplot of lean body mass vs height with sex been colored different colors. Looking at the scatterplot, I would argue that there seems to be a slight interaction effect between Sex and Ht. The reason why is that the lines of best fit aren't exactly parallel, meaning that the effect of height on lean body mass isn't necessarily consistent across sexes. However, because the linear regression lines have 95% confidence intervals for the slopes that overlap significantly, the slopes are not significantly different from one another, meaning there's not enough evidence that interaction effect is present. 
+
+```{r part e}
+
+ggplot(hw6, aes(x =Ht, y =LBM,color = Sex)) +
+  geom_point( ) +
+  geom_smooth(method = lm)
+
+```
+
+
+
+### Part F
+
+Using the predict() function to predict the lean body mass of a female athlete that is 180 cm tall and has a red blood cell count of 4.5, we get that their estimated LBM is 59.153. 
+
+```{r part f}
+
+p1 <- predict(lm.fit.3, newdata = data.frame(Ht = 180, RCC = 4.5, Sex = "f"))
+p1
+
+  
+```
+
+
+
+### Part G
+
+Using the predict() function to predict the lean body mass of a female athlete that is 181 cm tall and has a red blood cell count of 4.5, we get that their estimated LBM is 59.896.
+
+Computing the difference between these 2 predictions, we get a lean body mass of 0.74254. Looking back at the summary() function outputs from part D, we see that this matches the coefficient for Ht. This makes intuitive sense because our LBM predictions differed by the matter of a 1 cm increase in Ht and the Ht summary coefficient represents the change in LBM when height is increased by 1 cm with all other factors held constant. 
+
+```{r part g}
+
+
+p2 <- predict(lm.fit.3, newdata = data.frame(Ht = 181, RCC = 4.5, Sex = "f"))
+p2
+
+p2-p1
+
+  
+```
+
+
+### Part H
+
+Next, we use 5-fold cross validation to estimate the test RMSE of our full linear model. 5-fold cross validation indicates that we randomly split the entire data set into 5 disparate subsets then take turns using 1 of the 5 subsets as a testing set and the remaining 4 subsets as a training set. Finally, we average over these 5 folds. 
+
+To assess test error, we look at the RMSE value. We achieved an RMSE of 2.746. The lower the RMSE, the better the fit. Since the summary statistics for our response variable LBM show a unimodal distribution with no skews as well as a standard deviation of 13.070, our RMSE of 2.746 is small and represents a good fit. 
+
+```{r part h}
+
+library(caret)
+set.seed(1)
+
+fitControl <- trainControl(method = "cv", number = 5)
+
+model.5cv <- train(LBM ~ ., 
+                  data = hw6, 
+                  method = "lm",
+                  trControl = fitControl)
+model.5cv
+
+summary(hw6$LBM)
+sd(hw6$LBM)
+  
+```
+
+ 
+
+### Part I
+
+We check all odd values of our tuning parameter k from 1 to 19 inclusive, but without centering or scaling the variables. The optimal value for k is the k with the lowest RMSE - which is k = 5 with an RMSE of 4.688. 
+
+Our model performed worse than linear regression as linear regression produced a lower test error (RMSE = 2.746) than our k-Nearest Neighbors with k = 5 (RMSE = 4.688). This most likely happened because KNN has higher variance than linear regression as a byproduct of being a nonparametric model and not making strong assumptions. 
+
+```{r part i}
+set.seed(1)
+kGrid <- expand.grid(k = seq(1, 19, by = 2))
+
+
+
+model.knn <- train(LBM ~ ., 
+                      data = hw6, 
+                      method = "knn",
+                      trControl = fitControl,
+                      tuneGrid = kGrid)
+
+model.knn
+
+```
+
+
+### Part J
+
+Now we perform KNN, but with the variables centered and scaled. Our test RMSEs performed better across the board, although now k = 3 is the optimal tuning parameter with an RMSE of 3.789.
+
+If we look at the standard deviations of our numeric variables it makes intuitive sense that scaling the variables would decrease RMSE. The reasoning is that RCC has a substantially lower standard deviation than the other variables - which would disproportionately weigh the variable less than the other numeric variables when all variables are non-scaled. This would inherently increase error in any non-scaled models. 
+
+```{r part j}
+set.seed(1)
+model.knn.sc <- train(LBM ~ ., 
+                      data = hw6, 
+                      method = "knn",
+                      preProc = c("center", "scale"),
+                      trControl = fitControl,
+                      tuneGrid = kGrid)
+
+model.knn.sc
+
+
+table(hw6$Sex)
+hw6.vars <- as.list(hw6)
+hw6.vars$Sex <- NULL
+lapply(hw6.vars, sd)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
